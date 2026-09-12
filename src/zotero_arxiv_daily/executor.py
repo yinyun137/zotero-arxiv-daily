@@ -45,7 +45,10 @@ class Executor:
         collections = zot.everything(zot.collections())
         collections = {c['key']:c for c in collections}
         corpus = zot.everything(zot.items(itemType='conferencePaper || journalArticle || preprint'))
-        corpus = [c for c in corpus if c['data']['abstractNote'] != '']
+        # items tagged 'ai-picks' are curated imports; excluding them keeps them out of
+        # the ranking corpus so the recommender does not reinforce its own selections
+        corpus = [c for c in corpus if c['data']['abstractNote'] != ''
+                  and not any(t.get('tag') == 'ai-picks' for t in c['data'].get('tags', []))]
         def get_collection_path(col_key:str) -> str:
             if p := collections[col_key]['data']['parentCollection']:
                 return get_collection_path(p) + '/' + collections[col_key]['data']['name']
