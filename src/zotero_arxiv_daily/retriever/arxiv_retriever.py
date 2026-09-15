@@ -8,6 +8,7 @@ import feedparser
 from tqdm import tqdm
 import multiprocessing
 import os
+import random
 from queue import Empty
 from time import sleep
 from typing import Any, Callable, TypeVar
@@ -114,7 +115,9 @@ class ArxivRetriever(BaseRetriever):
             raise ValueError("category must be specified for arxiv.")
 
     def _retrieve_raw_papers(self) -> list[ArxivResult]:
-        client = arxiv.Client(num_retries=10, delay_seconds=10)
+        # Shared GitHub Actions egress IPs get hard rate-limited by arXiv; rapid
+        # internal retries prolong the ban, so keep them low and pace from here.
+        client = arxiv.Client(num_retries=3, delay_seconds=10)
         query = '+'.join(self.config.source.arxiv.category)
         include_cross_list = self.config.source.arxiv.get("include_cross_list", False)
         # Get the latest paper from arxiv rss feed
@@ -133,9 +136,14 @@ class ArxivRetriever(BaseRetriever):
 
         # Get full information of each paper from arxiv api
         bar = tqdm(total=len(all_paper_ids))
-        max_batch_retries = 5
-        batch_retry_delay = 30
+        max_batch_retries = 10
+        throttled = False
         for i in range(0, len(all_paper_ids), 20):
+            if throttled:
+                cooldown = 120
+                logger.info(f"Cooling down {cooldown}s after rate-limited batches, before batch {i // 20}")
+                sleep(cooldown)
+                throttled = False
             search = arxiv.Search(id_list=all_paper_ids[i:i + 20])
             for attempt in range(max_batch_retries):
                 try:
@@ -145,7 +153,8 @@ class ArxivRetriever(BaseRetriever):
                     break
                 except arxiv.HTTPError as exc:
                     if exc.status == 429 and attempt < max_batch_retries - 1:
-                        wait = batch_retry_delay * (attempt + 1)
+                        throttled = True
+                        wait = min(60 * (2 ** attempt), 600) + random.randint(0, 30)
                         logger.warning(f"arXiv API 429 on batch {i // 20}, retry {attempt + 1}/{max_batch_retries} in {wait}s")
                         sleep(wait)
                     else:
