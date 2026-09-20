@@ -35,8 +35,9 @@ The app follows a linear pipeline orchestrated by `Executor` (`src/zotero_arxiv_
 2. **Filter corpus** — applies `include_path` glob patterns to select relevant collections
 3. **Retrieve new papers** — fetches from configured sources (arXiv RSS, bioRxiv/medRxiv REST API, chemRxiv via Crossref REST API)
 4. **Rerank** — scores candidates by weighted similarity to corpus (newer Zotero papers weighted higher)
-5. **Generate TLDRs + affiliations** — via OpenAI-compatible LLM API
-6. **Render + send email** — HTML email via SMTP
+5. **TypeSafe judgment re-rank** (optional, `executor.typesafe`) — re-scores the shortlist against a free-text research profile via the TypeSafe System One API, re-sorts and drops unrelated papers; failures keep the embedding order
+6. **Generate TLDRs + affiliations** — via OpenAI-compatible LLM API
+7. **Render + send email** — HTML email via SMTP
 
 ### Plugin Systems
 

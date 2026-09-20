@@ -7,6 +7,7 @@ from .protocol import CorpusPaper
 import random
 from datetime import datetime
 from .reranker import get_reranker_cls
+from .judgment import refine_top_papers
 from .construct_email import render_email
 from .utils import send_email
 from openai import OpenAI
@@ -114,6 +115,9 @@ class Executor:
             logger.info("Reranking papers...")
             reranked_papers = self.reranker.rerank(all_papers, corpus)
             reranked_papers = reranked_papers[:self.config.executor.max_paper_num]
+            if self.config.executor.typesafe.enabled:
+                logger.info("TypeSafe judgment re-ranking...")
+                reranked_papers = refine_top_papers(reranked_papers, self.config.executor.typesafe)
             logger.info("Generating TLDR and affiliations...")
             for p in tqdm(reranked_papers):
                 p.generate_tldr(self.openai_client, self.config.llm)

@@ -52,3 +52,9 @@ executor:
   max_paper_num: 100 # The maximum number of the papers presented in the email. Example: 100
   source: ??? # The sources of papers to retrieve. Example: ['arxiv','biorxiv','medrxiv','chemrxiv']
   reranker: local # The reranker to use. Example: 'local' or 'api'
+  typesafe:
+    enabled: false # Second-stage relevance judgment of the shortlisted papers via TypeSafe (https://typesafe.ai), needs the TYPESAFE_API_KEY env var. Failed calls keep the embedding order.
+    profile: null # Free-text research-interest profile the papers are judged against. Example: "Program analysis, fuzzing, symbolic execution, LLM agent security"
+    min_score: 1 # Papers judged below this level (see levels) are dropped from the email. Example: 0 keeps everything
+    model: jev-latest # The TypeSafe System One model used for the judgment. Example: 'jev-latest'
+    levels: null # Ordered relevance levels, lowest first. Defaults to a 4-level 0..3 scale in judgment.py
