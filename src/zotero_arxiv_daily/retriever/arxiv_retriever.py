@@ -136,6 +136,10 @@ class ArxivRetriever(BaseRetriever):
 
         # Get full information of each paper from arxiv api
         bar = tqdm(total=len(all_paper_ids))
+        # 2026-09 起 arXiv 网关对数据中心/突发流量还会间歇性返回 406（语义化拒绝，
+        # 与 429 同为软封锁）。除 429 外将 406/5xx 一并纳入重试，并在 export 与
+        # 主站两个 API 主机间轮换以提高命中。
+        api_hosts = ("export.arxiv.org", "arxiv.org")
         max_batch_retries = 10
         throttled = False
         for i in range(0, len(all_paper_ids), 20):
@@ -152,15 +156,17 @@ class ArxivRetriever(BaseRetriever):
                     raw_papers.extend(batch)
                     break
                 except arxiv.HTTPError as exc:
-                    if exc.status == 429 and attempt < max_batch_retries - 1:
+                    if exc.status in (429, 406, 500, 502, 503) and attempt < max_batch_retries - 1:
                         throttled = True
                         wait = min(60 * (2 ** attempt), 600) + random.randint(0, 30)
-                        logger.warning(f"arXiv API 429 on batch {i // 20}, retry {attempt + 1}/{max_batch_retries} in {wait}s")
+                        host = api_hosts[attempt % len(api_hosts)]
+                        client.query_url_format = f"https://{host}/api/query?{{}}"
+                        logger.warning(f"arXiv API {exc.status} on batch {i // 20}, retry {attempt + 1}/{max_batch_retries} in {wait}s via {host}")
                         sleep(wait)
                     else:
                         raise
             if i + 20 < len(all_paper_ids):
-                sleep(3)
+                sleep(5)
         bar.close()
 
         return raw_papers
